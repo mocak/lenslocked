@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func ParseForm(r *http.Request, dst interface{}) error {
+func parseForm(r *http.Request, dst interface{}) error {
 	if err := r.ParseForm(); err != nil {
 		return err
 	}
