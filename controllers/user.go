@@ -9,12 +9,12 @@ import (
 )
 
 type Users struct {
-	us        *models.UserService
+	us        models.UserService
 	NewView   *views.View
 	LoginView *views.View
 }
 
-func NewUsers(us *models.UserService) *Users {
+func NewUsers(us models.UserService) *Users {
 	return &Users{
 		us:        us,
 		NewView:   views.NewView("bootstrap", "users/new"),
