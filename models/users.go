@@ -7,6 +7,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"lenslocked.com/hash"
 	"lenslocked.com/rand"
+	"regexp"
+	"strings"
 )
 
 const (
@@ -18,7 +20,10 @@ var (
 	// ErrNotFound is returned when a resource cannot be found in the database.
 	ErrNotFound        = errors.New("models: resource not found")
 	ErrInvalidID       = errors.New("models: ID provided was invalid")
-	ErrInvalidPassword = errors.New("models: Incorrect password provided")
+	ErrInvalidPassword = errors.New("models: incorrect password provided")
+	ErrEmailRequired   = errors.New("models: email address is required")
+	ErrEmailInvalid    = errors.New("models: email address is not valid")
+	ErrEmailTaken      = errors.New("models: email address is already taken")
 )
 
 type UserDB interface {
@@ -134,9 +139,18 @@ func (ug *userGorm) ByRemember(rememberHash string) (*User, error) {
 	return &user, nil
 }
 
+func newUserValidator(udb UserDB, hmac hash.HMAC) *userValidator {
+	return &userValidator{
+		UserDB:     udb,
+		hmac:       hmac,
+		emailRegex: regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,16}$`),
+	}
+}
+
 type userValidator struct {
 	UserDB
-	hmac hash.HMAC
+	hmac       hash.HMAC
+	emailRegex *regexp.Regexp
 }
 
 type userValFn func(user *User) error
@@ -187,13 +201,67 @@ func (uv *userValidator) idGreaterThan(n uint) userValFn {
 	}
 }
 
-func (uv *userValidator) ByID(id uint) (*User, error) {
-	// Validate the ID
-	if id <= 0 {
-		return nil, errors.New("Invalid ID")
+func (uv *userValidator) normalizeEmail(user *User) error {
+	user.Email = strings.ToLower(user.Email)
+	user.Email = strings.TrimSpace(user.Email)
+	return nil
+}
+
+func (uv *userValidator) requireEmail(user *User) error {
+	if user.Email == "" {
+		return ErrEmailRequired
 	}
-	// If it is valid, call the next method in the chain and // return its results.
+
+	return nil
+}
+
+func (uv *userValidator) emailFormat(user *User) error {
+	if user.Email == "" {
+		return nil
+	}
+
+	if uv.emailRegex.Match([]byte(user.Email)) {
+		return nil
+	}
+
+	return ErrEmailInvalid
+}
+
+func (uv *userValidator) emailIsAvail(user *User) error {
+	existing, err := uv.UserDB.ByEmail(user.Email)
+	if err == ErrNotFound {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if existing.Email != user.Email {
+		return ErrEmailTaken
+	}
+
+	return nil
+}
+
+func (uv *userValidator) ByID(id uint) (*User, error) {
+	user := User{Model: gorm.Model{ID: id}}
+
+	if err := runUserValFns(&user,
+		uv.idGreaterThan(0)); err != nil {
+		return nil, err
+	}
 	return uv.UserDB.ByID(id)
+}
+
+func (uv *userValidator) ByEmail(email string) (*User, error) {
+	user := User{Email: email}
+	if err := runUserValFns(&user,
+		uv.normalizeEmail); err != nil {
+		return nil, err
+	}
+
+	return uv.UserDB.ByEmail(email)
 }
 
 func (uv *userValidator) ByRemember(token string) (*User, error) {
@@ -211,6 +279,10 @@ func (uv *userValidator) Create(user *User) error {
 		uv.bcryptPassword,
 		uv.setRememberIfUnset,
 		uv.hmacRemember,
+		uv.normalizeEmail,
+		uv.requireEmail,
+		uv.emailFormat,
+		uv.emailIsAvail,
 	); err != nil {
 		return err
 	}
@@ -222,6 +294,10 @@ func (uv *userValidator) Update(user *User) error {
 	if err := runUserValFns(user,
 		uv.bcryptPassword,
 		uv.hmacRemember,
+		uv.normalizeEmail,
+		uv.requireEmail,
+		uv.emailFormat,
+		uv.emailIsAvail,
 	); err != nil {
 		return err
 	}
@@ -245,12 +321,9 @@ func NewUserService(connectionInfo string) (UserService, error) {
 		return nil, err
 	}
 	hmac := hash.NewHMAC(hmacSecretKey)
-	uv := userValidator{
-		UserDB: ug,
-		hmac:   hmac,
-	}
+	uv := newUserValidator(ug, hmac)
 	return &userService{
-		UserDB: &uv,
+		UserDB: uv,
 	}, nil
 }
 
@@ -273,7 +346,6 @@ func (us *userService) Authenticate(email, password string) (*User, error) {
 	default:
 		return nil, err
 	}
-
 }
 
 func first(db *gorm.DB, dst interface{}) error {
