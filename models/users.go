@@ -18,12 +18,12 @@ const (
 
 var (
 	// ErrNotFound is returned when a resource cannot be found in the database.
-	ErrNotFound        = errors.New("models: resource not found")
-	ErrInvalidID       = errors.New("models: ID provided was invalid")
-	ErrInvalidPassword = errors.New("models: incorrect password provided")
-	ErrEmailRequired   = errors.New("models: email address is required")
-	ErrEmailInvalid    = errors.New("models: email address is not valid")
-	ErrEmailTaken      = errors.New("models: email address is already taken")
+	ErrNotFound          = errors.New("models: resource not found")
+	ErrIDInvalid         = errors.New("models: ID provided was invalid")
+	ErrPasswordIncorrect = errors.New("models: incorrect password provided")
+	ErrEmailRequired     = errors.New("models: email address is required")
+	ErrEmailInvalid      = errors.New("models: email address is not valid")
+	ErrEmailTaken        = errors.New("models: email address is already taken")
 )
 
 type UserDB interface {
@@ -195,7 +195,7 @@ func (uv *userValidator) setRememberIfUnset(user *User) error {
 func (uv *userValidator) idGreaterThan(n uint) userValFn {
 	return func(user *User) error {
 		if user.ID <= n {
-			return ErrInvalidID
+			return ErrIDInvalid
 		}
 		return nil
 	}
@@ -342,7 +342,7 @@ func (us *userService) Authenticate(email, password string) (*User, error) {
 	case nil:
 		return user, nil
 	case bcrypt.ErrMismatchedHashAndPassword:
-		return nil, ErrInvalidPassword
+		return nil, ErrPasswordIncorrect
 	default:
 		return nil, err
 	}
