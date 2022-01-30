@@ -34,7 +34,7 @@ func main() {
 	r := mux.NewRouter()
 	r.Handle("/", staticC.Home).Methods("GET")
 	r.Handle("/contact", staticC.Contact).Methods("GET")
-	r.Handle("/signup", userC.NewView).Methods("GET")
+	r.HandleFunc("/signup", userC.New).Methods("GET")
 	r.HandleFunc("/signup", userC.Create).Methods("POST")
 	r.Handle("/login", userC.LoginView).Methods("GET")
 	r.HandleFunc("/login", userC.Login).Methods("POST")
