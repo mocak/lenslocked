@@ -24,6 +24,10 @@ var (
 	ErrEmailRequired     = errors.New("models: email address is required")
 	ErrEmailInvalid      = errors.New("models: email address is not valid")
 	ErrEmailTaken        = errors.New("models: email address is already taken")
+	ErrPasswordRequired  = errors.New("models: password is required")
+	ErrPasswordTooShort  = errors.New("models: password must be at least 8 characters long")
+	ErrRememberRequired  = errors.New("models: remember token is required")
+	ErrRememberTooShort  = errors.New("models: remember token must be at least 32 characters long")
 )
 
 type UserDB interface {
@@ -244,6 +248,51 @@ func (uv *userValidator) emailIsAvail(user *User) error {
 	return nil
 }
 
+func (uv *userValidator) passwordMinLength(user *User) error {
+	if user.Password == "" {
+		return nil
+	}
+
+	if len(user.Password) < 8 {
+		return ErrPasswordTooShort
+	}
+
+	return nil
+}
+
+func (uv *userValidator) passwordRequired(user *User) error {
+	if user.Password == "" {
+		return ErrPasswordRequired
+	}
+
+	return nil
+}
+
+func (uv *userValidator) rememberMinBytes(user *User) error {
+	if user.Remember == "" {
+		return nil
+	}
+
+	n, err := rand.NBytes(user.Remember)
+	if err != nil {
+		return err
+	}
+
+	if n < 32 {
+		return ErrRememberTooShort
+	}
+
+	return nil
+}
+
+func (uv *userValidator) rememberHashRequired(user *User) error {
+	if user.RememberHash == "" {
+		return ErrRememberRequired
+	}
+
+	return nil
+}
+
 func (uv *userValidator) ByID(id uint) (*User, error) {
 	user := User{Model: gorm.Model{ID: id}}
 
@@ -276,9 +325,13 @@ func (uv *userValidator) ByRemember(token string) (*User, error) {
 func (uv *userValidator) Create(user *User) error {
 
 	if err := runUserValFns(user,
+		uv.passwordRequired,
+		uv.passwordMinLength,
 		uv.bcryptPassword,
 		uv.setRememberIfUnset,
+		uv.rememberMinBytes,
 		uv.hmacRemember,
+		uv.rememberHashRequired,
 		uv.normalizeEmail,
 		uv.requireEmail,
 		uv.emailFormat,
@@ -292,8 +345,11 @@ func (uv *userValidator) Create(user *User) error {
 
 func (uv *userValidator) Update(user *User) error {
 	if err := runUserValFns(user,
+		uv.passwordMinLength,
 		uv.bcryptPassword,
+		uv.rememberMinBytes,
 		uv.hmacRemember,
+		uv.rememberHashRequired,
 		uv.normalizeEmail,
 		uv.requireEmail,
 		uv.emailFormat,
