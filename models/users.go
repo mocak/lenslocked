@@ -49,10 +49,6 @@ type UserDB interface {
 	Create(user *User) error
 	Update(user *User) error
 	Delete(id uint) error
-
-	Close() error
-	AutoMigrate() error
-	DestructiveReset() error
 }
 
 type UserService interface {
@@ -74,32 +70,6 @@ var _ UserDB = &userGorm{}
 
 type userGorm struct {
 	db *gorm.DB
-}
-
-func newUserGorm(connectionInfo string) (*userGorm, error) {
-	db, err := gorm.Open("postgres", connectionInfo)
-	if err != nil {
-		return nil, err
-	}
-	db.LogMode(true)
-	return &userGorm{db: db}, nil
-}
-
-// Close closes the UserService database connection
-func (ug *userGorm) Close() error {
-	return ug.db.Close()
-}
-
-func (ug *userGorm) AutoMigrate() error {
-	return ug.db.AutoMigrate(&User{}).Error
-}
-
-// DestructiveReset drops the user table and rebuilds it
-func (ug *userGorm) DestructiveReset() error {
-	if err := ug.db.DropTableIfExists(&User{}).Error; err != nil {
-		return err
-	}
-	return ug.AutoMigrate()
 }
 
 // Create saves provided user to storage and fills storage related data such as ID
@@ -382,16 +352,13 @@ func (uv *userValidator) Delete(id uint) error {
 }
 
 // NewUserService returns UserService
-func NewUserService(connectionInfo string) (UserService, error) {
-	ug, err := newUserGorm(connectionInfo)
-	if err != nil {
-		return nil, err
-	}
+func NewUserService(db *gorm.DB) UserService {
+	ug := &userGorm{db: db}
 	hmac := hash.NewHMAC(hmacSecretKey)
 	uv := newUserValidator(ug, hmac)
 	return &userService{
 		UserDB: uv,
-	}, nil
+	}
 }
 
 type userService struct {

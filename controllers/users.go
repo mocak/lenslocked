@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"lenslocked.com/models"
 	"lenslocked.com/rand"
@@ -120,7 +121,13 @@ func (u Users) CookieTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintln(w, cookie)
+	user, err := u.us.ByRemember(cookie.Value)
+
+	fmt.Fprintf(w, "%+v\n", cookie)
+
+	json, _ := json.MarshalIndent(user, "", "    ")
+
+	fmt.Fprintln(w, string(json))
 }
 
 type SignupForm struct {
