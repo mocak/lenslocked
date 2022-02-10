@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"lenslocked.com/controllers"
+	"lenslocked.com/middleware"
 	"lenslocked.com/models"
 	"net/http"
 
@@ -27,10 +28,16 @@ func main() {
 	}
 	defer services.Close()
 	services.AutoMigrate()
-	// us.DestructiveReset()
 
 	staticC := controllers.NewStatic()
 	userC := controllers.NewUsers(services.User)
+	galleryC := controllers.NewGalleries(services.Gallery)
+	requireUserMw := middleware.RequireUser{
+		UserService: services.User,
+	}
+
+	newGallery := requireUserMw.Apply(galleryC.New)
+	createGallery := requireUserMw.ApplyFn(galleryC.Create)
 
 	r := mux.NewRouter()
 	r.Handle("/", staticC.Home).Methods("GET")
@@ -40,6 +47,8 @@ func main() {
 	r.Handle("/login", userC.LoginView).Methods("GET")
 	r.HandleFunc("/login", userC.Login).Methods("POST")
 	r.HandleFunc("/cookietest", userC.CookieTest).Methods("GET")
+	r.Handle("/galleries/new", newGallery).Methods("GET")
+	r.Handle("/galleries", createGallery).Methods("POST")
 
 	if err := http.ListenAndServe(":3000", r); err != nil {
 		panic(err)
