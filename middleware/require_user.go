@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"fmt"
+	"lenslocked.com/context"
 	"lenslocked.com/models"
 	"net/http"
 )
@@ -12,7 +12,7 @@ type RequireUser struct {
 
 func (mw *RequireUser) ApplyFn(next http.HandlerFunc) http.HandlerFunc {
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("remember_token")
 		if err != nil {
 			http.Redirect(w, r, "/login", http.StatusFound)
@@ -24,9 +24,11 @@ func (mw *RequireUser) ApplyFn(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		fmt.Println("User found: ", user)
+		ctx := r.Context()
+		ctx = context.WithUser(ctx, user)
+		r = r.WithContext(ctx)
 		next(w, r)
-	})
+	}
 }
 
 func (mw *RequireUser) Apply(next http.Handler) http.HandlerFunc {

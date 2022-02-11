@@ -29,9 +29,10 @@ func main() {
 	defer services.Close()
 	services.AutoMigrate()
 
+	r := mux.NewRouter()
 	staticC := controllers.NewStatic()
 	userC := controllers.NewUsers(services.User)
-	galleryC := controllers.NewGalleries(services.Gallery)
+	galleryC := controllers.NewGalleries(services.Gallery, r)
 	requireUserMw := middleware.RequireUser{
 		UserService: services.User,
 	}
@@ -39,7 +40,6 @@ func main() {
 	newGallery := requireUserMw.Apply(galleryC.New)
 	createGallery := requireUserMw.ApplyFn(galleryC.Create)
 
-	r := mux.NewRouter()
 	r.Handle("/", staticC.Home).Methods("GET")
 	r.Handle("/contact", staticC.Contact).Methods("GET")
 	r.HandleFunc("/signup", userC.New).Methods("GET")
@@ -49,6 +49,7 @@ func main() {
 	r.HandleFunc("/cookietest", userC.CookieTest).Methods("GET")
 	r.Handle("/galleries/new", newGallery).Methods("GET")
 	r.Handle("/galleries", createGallery).Methods("POST")
+	r.HandleFunc("/galleries/{id:[0-9]+}", galleryC.Show).Methods("GET").Name(controllers.ShowGallery)
 
 	if err := http.ListenAndServe(":3000", r); err != nil {
 		panic(err)
