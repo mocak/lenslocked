@@ -1,6 +1,9 @@
 package views
 
-import "log"
+import (
+	"lenslocked.com/models"
+	"log"
+)
 
 const (
 	AlertLvlError   = "danger"
@@ -19,6 +22,7 @@ type Alert struct {
 
 type Data struct {
 	Alert *Alert
+	User  *models.User
 	Yield interface{}
 }
 

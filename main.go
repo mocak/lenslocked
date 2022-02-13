@@ -30,12 +30,15 @@ func main() {
 	services.AutoMigrate()
 
 	r := mux.NewRouter()
+
 	staticC := controllers.NewStatic()
 	userC := controllers.NewUsers(services.User)
 	galleryC := controllers.NewGalleries(services.Gallery, r)
-	requireUserMw := middleware.RequireUser{
+
+	userMw := middleware.User{
 		UserService: services.User,
 	}
+	requireUserMw := middleware.RequireUser{}
 
 	newGallery := requireUserMw.Apply(galleryC.New)
 	createGallery := requireUserMw.ApplyFn(galleryC.Create)
@@ -49,16 +52,23 @@ func main() {
 	r.HandleFunc("/cookietest", userC.CookieTest).Methods("GET")
 	r.Handle("/galleries/new", newGallery).Methods("GET")
 	r.Handle("/galleries", createGallery).Methods("POST")
-	r.HandleFunc("/galleries/{id:[0-9]+}", galleryC.Show).Methods("GET").Name(controllers.ShowGallery)
+	r.HandleFunc("/galleries/{id:[0-9]+}", galleryC.Show).
+		Methods("GET").
+		Name(controllers.ShowGallery)
 	r.HandleFunc("/galleries/{id:[0-9]+}/edit",
-		requireUserMw.ApplyFn(galleryC.Edit)).Methods("GET")
+		requireUserMw.ApplyFn(galleryC.Edit)).
+		Methods("GET").
+		Name(controllers.EditGallery)
 	r.HandleFunc("/galleries/{id:[0-9]+}/update",
 		requireUserMw.ApplyFn(galleryC.Update)).Methods("POST")
 	r.HandleFunc("/galleries/{id:[0-9]+}/delete",
 		requireUserMw.ApplyFn(galleryC.Delete)).Methods("POST")
-	r.HandleFunc("/galleries", requireUserMw.ApplyFn(galleryC.Index)).Methods("GET")
+	r.HandleFunc("/galleries",
+		requireUserMw.ApplyFn(galleryC.Index)).
+		Methods("GET").
+		Name(controllers.IndexGalleries)
 
-	if err := http.ListenAndServe(":3000", r); err != nil {
+	if err := http.ListenAndServe(":3000", userMw.Apply(r)); err != nil {
 		panic(err)
 	}
 }
