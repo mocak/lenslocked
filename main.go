@@ -50,6 +50,13 @@ func main() {
 	r.Handle("/galleries/new", newGallery).Methods("GET")
 	r.Handle("/galleries", createGallery).Methods("POST")
 	r.HandleFunc("/galleries/{id:[0-9]+}", galleryC.Show).Methods("GET").Name(controllers.ShowGallery)
+	r.HandleFunc("/galleries/{id:[0-9]+}/edit",
+		requireUserMw.ApplyFn(galleryC.Edit)).Methods("GET")
+	r.HandleFunc("/galleries/{id:[0-9]+}/update",
+		requireUserMw.ApplyFn(galleryC.Update)).Methods("POST")
+	r.HandleFunc("/galleries/{id:[0-9]+}/delete",
+		requireUserMw.ApplyFn(galleryC.Delete)).Methods("POST")
+	r.HandleFunc("/galleries", requireUserMw.ApplyFn(galleryC.Index)).Methods("GET")
 
 	if err := http.ListenAndServe(":3000", r); err != nil {
 		panic(err)

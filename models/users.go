@@ -222,7 +222,7 @@ func (uv *userValidator) emailIsAvail(user *User) error {
 		return err
 	}
 
-	if existing.Email != user.Email {
+	if user.ID != existing.ID {
 		return ErrEmailTaken
 	}
 
